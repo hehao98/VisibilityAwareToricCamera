@@ -34,6 +34,8 @@ public class CameraControl : MonoBehaviour
     public const float thetaMax = 2 * (Mathf.PI - 0.57f);
     public const float phiMin   = 0.001f;
     public const float phiMax   = 2 * Mathf.PI;
+    public float originalPhi = Mathf.PI;
+    public float originalTheta = Mathf.PI;
     [Range(phiMin, phiMax)]
     public float phi;
     [Range(thetaMin, thetaMax)]
@@ -78,8 +80,8 @@ public class CameraControl : MonoBehaviour
                                       wposB);
 
         alpha = toric.getAlpha().valueRadians();
-        theta = Mathf.PI;
-        phi   = Mathf.PI;
+        theta = originalTheta;
+        phi   = originalPhi;
 
         // Generate sample points
         rayCastSamplePoints = new List<Vector3>();
@@ -102,6 +104,8 @@ public class CameraControl : MonoBehaviour
             Vector3 p2 = pos2 + deltas[i] * r;
             rayCastSamplePoints.Add(p1);
             rayCastSamplePoints.Add(p2);
+            rayCastSamplePoints.Add(pos1 + deltas[i] * r * 0.5f);
+            rayCastSamplePoints.Add(pos2 + deltas[i] * r * 0.5f);
         }
 	}
 	
@@ -122,36 +126,24 @@ public class CameraControl : MonoBehaviour
         // Display potential occulsions
         GameObject obstacle;
 
-        if (IsOcculuded(cam.transform.position, actor1, out obstacle))
-        {
-            obstacle.GetComponent<MeshRenderer>().material.color = Color.red;
-        }
-        else if (IsOcculuded(cam.transform.position, actor2, out obstacle))
-        {
-            obstacle.GetComponent<MeshRenderer>().material.color = Color.blue;
-        }
-        else
-        {
-            foreach (GameObject ob in obstacles)
-            {
-                ob.GetComponent<MeshRenderer>().material.color = Color.white;
-            }
-        }
+        IsOcculuded(cam.transform.position, actor1, out obstacle);
+        if (obstacle == null)
+            IsOcculuded(cam.transform.position, actor2, out obstacle);
 
-        if (obstacle != null) 
-        { // Start occulsion avoidance
-            switch (strategy) {
-                case Strategy.RandomFix:
+        switch (strategy) {
+            case Strategy.RandomFix:
+                if (obstacle != null)
                     RandomFix();
-                    break;
-                case Strategy.SimulatedAnnealing:
+                break;
+            case Strategy.SimulatedAnnealing:
+                if (obstacle != null)
                     SimulateAnnealing();
-                    break;
-                case Strategy.GradientDescend:
-                    GradientDescend();
-                    break;
-            }
+                break;
+            case Strategy.GradientDescend:
+                GradientDescend();
+                break;
         }
+        
 
         UpdateCamera(cam.transform, theta, phi);
     }
@@ -255,7 +247,7 @@ public class CameraControl : MonoBehaviour
         // We don't change alpha in this optimization
         // theta in [0, 2*(PI-0.57)]
         // phi   in [0, 2*PI]
-        Vector2 origin = new Vector2(theta, phi);
+        Vector2 origin = new Vector2(originalTheta, originalPhi);
         Vector2 curr = new Vector2(thetaMin, phiMin);
 
         // Take random samples, 
@@ -291,7 +283,8 @@ public class CameraControl : MonoBehaviour
         // We don't change alpha in this optimization
         // theta in [0, 2*(PI-0.57)]
         // phi   in [0, 2*PI]
-        Vector2 origin = new Vector2(theta, phi);
+        Vector2 origin = new Vector2(originalTheta, originalPhi);
+        Vector2 prev = new Vector2(theta, phi);
         Vector2 curr = new Vector2(thetaMin, phiMin);
 
         // Take random samples, 
@@ -356,9 +349,17 @@ public class CameraControl : MonoBehaviour
         }
 
         // Set new values in Toric Space
-        Vector2 change = (origin - curr).normalized;
-        theta += change.x * cameraSpeed * Time.deltaTime;
-        phi   += change.y * cameraSpeed * Time.deltaTime;
+        Vector2 change = (curr - prev).normalized;
+        if ((curr - prev).magnitude > Time.deltaTime * cameraSpeed)
+        {
+            change *= cameraSpeed * Time.deltaTime;
+        }
+        else
+        {
+            change = curr - prev;
+        }
+        theta += change.x;
+        phi += change.y;
         //theta = curr.x;
         //phi = curr.y;
     }
@@ -405,7 +406,8 @@ public class CameraControl : MonoBehaviour
         // We don't change alpha in this optimization
         // theta in [0, 2*(PI-0.57)]
         // phi   in [0, 2*PI]
-        Vector2 origin = new Vector2(theta, phi);
+        Vector2 origin = new Vector2(originalTheta, originalPhi);
+        Vector2 prev = new Vector2(theta, phi);
         Vector2 curr = new Vector2(theta, phi);
 
         for (int i = 0; i < 10; ++i)
@@ -421,15 +423,22 @@ public class CameraControl : MonoBehaviour
             }
 
             Vector2 next = curr;
-            float currentVisibility = Visibility(curr.x, curr.y);
+            int currentVisibility = Visibility(curr.x, curr.y);
             foreach (Vector2 dir in direction) 
             {
                 Vector2 next2 = curr + dir * 0.1f;
-                float gra = Visibility(next2.x, next2.y);
+                int gra = Visibility(next2.x, next2.y);
                 if (gra < currentVisibility)
                 {
                     currentVisibility = gra;
                     next = next2;
+                }
+                else if (gra == currentVisibility)
+                {
+                    if (gra == 0 && (next2 - origin).magnitude < (next - origin).magnitude)
+                    {
+                        next = next2;   
+                    }
                 }
             }
 
@@ -437,11 +446,16 @@ public class CameraControl : MonoBehaviour
         }
 
         // Set new values in Toric Space
-        //Vector2 change = (origin - curr).normalized;
-        //theta += change.x * cameraSpeed * Time.deltaTime;
-        //phi += change.y * cameraSpeed * Time.deltaTime;
-        theta = curr.x;
-        phi = curr.y;
+        Vector2 change = (curr - prev).normalized;
+        if ((curr - prev).magnitude > Time.deltaTime * cameraSpeed) {
+            change *= cameraSpeed * Time.deltaTime;
+        } else {
+            change = curr - prev;
+        }
+        theta += change.x;
+        phi += change.y;
+        //theta = curr.x;
+        //phi = curr.y;
     }
 
     int Visibility(float th, float ph)
@@ -458,7 +472,12 @@ public class CameraControl : MonoBehaviour
 
             foreach (RaycastHit hit in hits) {
                 if (hit.collider.tag == "Obstacle") {
-                    result++;
+                    float hitDist = (hit.transform.position - cam.transform.position).magnitude;
+                    float sampleDist = (p - cam.transform.position).magnitude;
+                    if (hitDist < sampleDist)
+                    {
+                        result++;
+                    }
                 }
             }
         }
