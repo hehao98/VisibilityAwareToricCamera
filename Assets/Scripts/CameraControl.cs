@@ -500,9 +500,9 @@ public class CameraControl : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        foreach(Vector3 point in rayCastSamplePoints) {
-            Gizmos.DrawSphere(point, 0.1f);
-        }
+        //foreach(Vector3 point in rayCastSamplePoints) {
+            //Gizmos.DrawSphere(point, 0.1f);
+        //}
     }
 
     /****GUI Hook Functions****/

@@ -6,9 +6,9 @@ This is a course project of Computer Generated Imaginery and Visual Effects taug
 
 This project extends an automated camera control tool proposed on the paper "Intuitive and Effective Camera Control with the Toric Space" published on SIGGRAPH 2015. Obstacles, both static and dynamic, are common in real shooting scenes, thus this project attempts to explore ways that enable camera to automatically avoid incoming obstacles. Methods based on simulated annealing and numerical gradient descent are implemented and evaluated.
 
-For a detailed report, see `report.pdf` in the root folder.
+For a detailed report, see `Report.pdf` in the root folder.
 
-For a video, see this.
+For a video, see https://youtu.be/qHYZ0s7_SOM.
 
 ## Environment
 
